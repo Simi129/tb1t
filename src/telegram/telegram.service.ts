@@ -20,21 +20,32 @@ export class TelegramService implements OnModuleInit {
   }
 
   async onModuleInit() {
+    this.logger.log('TelegramService initializing...');
+    
     if (process.env.NODE_ENV === 'production') {
       const vercelUrl = process.env.VERCEL_URL;
+      
       if (vercelUrl) {
-        const webhookUrl = `https://${vercelUrl}/webhook/telegram`;
+        // ИСПРАВЛЕНО: webhook URL теперь указывает на api/telegram
+        const webhookUrl = `https://${vercelUrl}/api/telegram`;
+        
         try {
-          await this.bot.telegram.setWebhook(webhookUrl);
-          this.logger.log(`Webhook установлен: ${webhookUrl}`);
+          await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+          this.logger.log('Old webhook deleted');
+          
+          const result = await this.bot.telegram.setWebhook(webhookUrl);
+          this.logger.log(`Webhook set to: ${webhookUrl}, Result: ${result}`);
+          
+          const webhookInfo = await this.bot.telegram.getWebhookInfo();
+          this.logger.log(`Webhook info: ${JSON.stringify(webhookInfo)}`);
         } catch (error) {
           this.logger.error(`Ошибка установки webhook: ${error.message}`);
         }
       } else {
-        this.logger.warn('VERCEL_URL не найден, webhook не установлен');
+        this.logger.warn('VERCEL_URL не найден');
       }
     } else {
-      this.logger.log('Локальная разработка: используется polling');
+      this.logger.log('Локальная разработка');
     }
   }
 

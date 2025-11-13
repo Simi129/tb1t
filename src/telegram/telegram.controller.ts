@@ -1,23 +1,23 @@
 import { Controller, Post, Body, HttpCode, Logger } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 
-@Controller('webhook')
+@Controller()
 export class TelegramController {
   private readonly logger = new Logger(TelegramController.name);
 
   constructor(private telegramService: TelegramService) {}
 
-  @Post('telegram')
+  @Post('api/telegram')
   @HttpCode(200)
   async handleUpdate(@Body() update: any) {
-    this.logger.debug(`Received update: ${JSON.stringify(update)}`);
+    this.logger.log('Webhook received');
     
     try {
       await this.telegramService.handleUpdate(update);
       return { ok: true };
     } catch (error) {
-      this.logger.error(`Error handling webhook: ${error.message}`);
-      return { ok: false, error: error.message };
+      this.logger.error(`Error: ${error.message}`);
+      return { ok: false };
     }
   }
 }
