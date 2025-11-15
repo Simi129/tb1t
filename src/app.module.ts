@@ -5,12 +5,13 @@ import { TelegramModule } from './telegram/telegram.module';
 import { DatabaseModule } from './database/database.module';
 import supabaseConfig from './config/supabase.config';
 import telegramConfig from './config/telegram.config';
+import databaseConfig from './config/database.config'; // ДОБАВИТЬ
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [supabaseConfig, telegramConfig],
+      load: [supabaseConfig, telegramConfig, databaseConfig], // ДОБАВИТЬ databaseConfig
       envFilePath: ['.env.local', '.env'],
     }),
     TelegrafModule.forRootAsync({
@@ -20,10 +21,6 @@ import telegramConfig from './config/telegram.config';
         if (!token) {
           throw new Error('TELEGRAM_BOT_TOKEN must be provided');
         }
-        
-        // ИСПРАВЛЕНО: Упрощенная конфигурация без launchOptions
-        // В production webhook устанавливается в TelegramService
-        // В development автоматически используется polling
         return {
           token,
         };
