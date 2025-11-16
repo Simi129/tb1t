@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TelegrafModule } from 'nestjs-telegraf';
+import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from './telegram/telegram.module';
 import { DatabaseModule } from './database/database.module';
 import supabaseConfig from './config/supabase.config';
@@ -13,18 +12,8 @@ import telegramConfig from './config/telegram.config';
       load: [supabaseConfig, telegramConfig],
       envFilePath: ['.env.local', '.env'],
     }),
-    TelegrafModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const token = configService.get<string>('telegram.token');
-        if (!token) {
-          throw new Error('TELEGRAM_BOT_TOKEN must be provided');
-        }
-        return {
-          token,
-        };
-      },
-    }),
+    // ❌ УБРАЛИ TelegrafModule - он запускал polling и конфликтовал с webhook!
+    // TelegrafModule используется только для декораторов, но сам модуль не нужен
     DatabaseModule,
     TelegramModule,
   ],

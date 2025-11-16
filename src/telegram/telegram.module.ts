@@ -15,5 +15,6 @@ import { DatabaseModule } from '../database/database.module';
     StartCommand,
     HelpCommand,
   ],
+  exports: [TelegramService], // ДОБАВЛЕНО: экспортируем TelegramService для использования в api/telegram.ts
 })
 export class TelegramModule {}

@@ -27,22 +27,58 @@ export class DatabaseService implements OnModuleInit {
 
   async saveUser(telegramId: number, username: string, firstName: string) {
     try {
+      // ИСПРАВЛЕНО: используем upsert с правильным onConflict
       const { data, error } = await this.supabase
         .from('users')
-        .upsert({
-          telegram_id: telegramId,
-          username: username,
-          first_name: firstName,
-          last_seen: new Date().toISOString(),
-        })
+        .upsert(
+          {
+            telegram_id: telegramId,
+            username: username,
+            first_name: firstName,
+            last_seen: new Date().toISOString(),
+          },
+          {
+            onConflict: 'telegram_id', // указываем по какому полю делать upsert
+            ignoreDuplicates: false, // обновляем существующие записи
+          }
+        )
         .select();
 
-      if (error) throw error;
-      this.logger.log(`✅ User saved: ${telegramId}`);
+      if (error) {
+        // Если все еще ошибка - логируем, но не бросаем исключение
+        this.logger.warn(`⚠️ User upsert warning: ${error.message}`);
+        return null;
+      }
+      
+      this.logger.log(`✅ User saved/updated: ${telegramId}`);
       return data;
     } catch (error: any) {
+      // Ловим ошибку дубликата и просто обновляем запись
+      if (error.code === '23505') {
+        this.logger.log(`🔄 User already exists, updating: ${telegramId}`);
+        
+        // Обновляем существующую запись
+        const { data, error: updateError } = await this.supabase
+          .from('users')
+          .update({
+            username: username,
+            first_name: firstName,
+            last_seen: new Date().toISOString(),
+          })
+          .eq('telegram_id', telegramId)
+          .select();
+
+        if (updateError) {
+          this.logger.error(`❌ Error updating user: ${updateError.message}`);
+          return null;
+        }
+        
+        return data;
+      }
+      
       this.logger.error(`❌ Error saving user: ${error.message}`);
-      throw error;
+      // НЕ бросаем ошибку, чтобы не крашить весь процесс
+      return null;
     }
   }
 
@@ -54,11 +90,15 @@ export class DatabaseService implements OnModuleInit {
         .eq('telegram_id', telegramId)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        this.logger.error(`❌ Error getting user: ${error.message}`);
+        return null;
+      }
+      
       return data;
     } catch (error: any) {
       this.logger.error(`❌ Error getting user: ${error.message}`);
-      throw error;
+      return null;
     }
   }
 
@@ -78,7 +118,8 @@ export class DatabaseService implements OnModuleInit {
       return data;
     } catch (error: any) {
       this.logger.error(`❌ Error saving message: ${error.message}`);
-      throw error;
+      // НЕ бросаем ошибку
+      return null;
     }
   }
 }
