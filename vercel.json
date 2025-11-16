@@ -1,9 +1,18 @@
 {
   "version": 2,
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/telegram",
-      "destination": "/api/telegram"
+      "src": "api/telegram.ts",
+      "use": "@vercel/node"
     }
-  ]
+  ],
+  "routes": [
+    {
+      "src": "/api/telegram",
+      "dest": "/api/telegram.ts"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

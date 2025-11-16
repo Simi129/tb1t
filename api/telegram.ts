@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { INestApplication } from '@nestjs/common';
 import { GeoService } from '../src/utils/geo.service';
-import { DatabaseService } from '../src/database/database.service';
+import { TelegramService } from '../src/telegram/telegram.service';
 
 let app: INestApplication;
 
@@ -18,16 +18,24 @@ async function getApp() {
 
 export default async function handler(req: any, res: any) {
   try {
+    console.log('📨 Received request:', req.method);
+
+    // Только POST запросы от Telegram
+    if (req.method !== 'POST') {
+      return res.status(200).json({ ok: true, message: 'Bot is running' });
+    }
+
     const application = await getApp();
     const geoService = application.get(GeoService);
+    const telegramService = application.get(TelegramService);
 
     // Извлекаем реальный IP
     const realIP = geoService.extractRealIP(req.headers);
-    const isCanadian = geoService.isRussianIP(realIP); // переименовал для ясности
+    const isCanadian = geoService.isRussianIP(realIP); // используем существующий метод
 
     console.log(`📍 IP: ${realIP}, Canadian: ${isCanadian}`);
 
-    // 🇨🇦 Если траффик из Канады - проксируем на VPS (ДЛЯ ТЕСТА)
+    // 🇨🇦 Если трафик из Канады - проксируем на VPS
     if (isCanadian) {
       const VPS_URL = process.env.VPS_WEBHOOK_URL;
       
@@ -54,30 +62,18 @@ export default async function handler(req: any, res: any) {
       return res.status(response.status).json(data);
     }
 
-    // Иначе обрабатываем через Supabase локально
+    // ✅ Обрабатываем через Supabase локально
     console.log(`✅ Processing with Supabase`);
     
-    const databaseService = application.get(DatabaseService);
     const update = req.body;
     
-    if (update.message) {
-      const { from, text } = update.message;
-      
-      await databaseService.saveUser(
-        from.id,
-        from.username || '',
-        from.first_name || '',
-      );
-
-      if (text) {
-        await databaseService.saveMessage(from.id, text);
-      }
-    }
+    // КРИТИЧНО! Передаем обновление в Telegraf для обработки команд
+    await telegramService.handleUpdate(update);
 
     return res.status(200).json({ ok: true });
     
   } catch (error: any) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error in handler:', error);
     return res.status(500).json({ 
       ok: false, 
       error: error.message 
