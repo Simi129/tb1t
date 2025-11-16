@@ -6,9 +6,10 @@ export class GeoService {
   private readonly logger = new Logger(GeoService.name);
 
   /**
-   * Проверяет, является ли IP адрес канадским (ДЛЯ ТЕСТА)
+   * Проверяет, является ли IP адрес канадским
+   * Канадский трафик направляется на VPS
    */
-  isRussianIP(ip: string | null): boolean {
+  isCanadianIP(ip: string | null): boolean {
     if (!ip || ip === '127.0.0.1' || ip === 'localhost') {
       this.logger.warn('⚠️ Local IP detected, defaulting to Supabase');
       return false;
@@ -22,7 +23,7 @@ export class GeoService {
         return false; // по умолчанию используем Supabase
       }
 
-      // 🇨🇦 ВРЕМЕННО: Канада → VPS (для теста)
+      // 🇨🇦 Канада → VPS
       const isCanadian = geo.country === 'CA';
       
       this.logger.log(

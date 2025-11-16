@@ -23,29 +23,34 @@ export class TelegramService implements OnModuleInit {
     this.logger.log('TelegramService initializing...');
     
     if (process.env.NODE_ENV === 'production') {
-      const vercelUrl = process.env.VERCEL_URL;
+      // ИСПРАВЛЕНО: используем кастомный домен или переменную WEBHOOK_URL
+      const webhookDomain = process.env.WEBHOOK_URL || 'tb1t.vercel.app';
+      const webhookUrl = `https://${webhookDomain}/api/telegram`;
       
-      if (vercelUrl) {
-        // ИСПРАВЛЕНО: webhook URL теперь указывает на api/telegram
-        const webhookUrl = `https://${vercelUrl}/api/telegram`;
+      this.logger.log(`🔧 Setting webhook to: ${webhookUrl}`);
+      
+      try {
+        // Удаляем старый webhook
+        await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        this.logger.log('✅ Old webhook deleted');
         
-        try {
-          await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
-          this.logger.log('Old webhook deleted');
-          
-          const result = await this.bot.telegram.setWebhook(webhookUrl);
-          this.logger.log(`Webhook set to: ${webhookUrl}, Result: ${result}`);
-          
-          const webhookInfo = await this.bot.telegram.getWebhookInfo();
-          this.logger.log(`Webhook info: ${JSON.stringify(webhookInfo)}`);
-        } catch (error) {
-          this.logger.error(`Ошибка установки webhook: ${error.message}`);
+        // Устанавливаем новый webhook
+        const result = await this.bot.telegram.setWebhook(webhookUrl);
+        this.logger.log(`✅ Webhook set successfully: ${result}`);
+        
+        // Проверяем установку webhook
+        const webhookInfo = await this.bot.telegram.getWebhookInfo();
+        this.logger.log(`📊 Webhook info: ${JSON.stringify(webhookInfo, null, 2)}`);
+        
+        if (webhookInfo.url !== webhookUrl) {
+          this.logger.error(`❌ Webhook URL mismatch! Expected: ${webhookUrl}, Got: ${webhookInfo.url}`);
         }
-      } else {
-        this.logger.warn('VERCEL_URL не найден');
+      } catch (error) {
+        this.logger.error(`❌ Error setting webhook: ${error.message}`);
+        throw error;
       }
     } else {
-      this.logger.log('Локальная разработка');
+      this.logger.log('🔧 Local development mode - webhook not set');
     }
   }
 
@@ -53,7 +58,8 @@ export class TelegramService implements OnModuleInit {
     try {
       await this.bot.handleUpdate(update);
     } catch (error) {
-      this.logger.error(`Error handling update: ${error.message}`);
+      this.logger.error(`❌ Error handling update: ${error.message}`);
+      throw error;
     }
   }
 
