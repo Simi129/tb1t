@@ -49,6 +49,24 @@ export class TelegramUpdate implements OnModuleInit {
       }
     });
 
+    // НОВАЯ КОМАНДА: /ping
+    bot.command('ping', async (ctx: Context) => {
+      try {
+        await this.onPing(ctx);
+      } catch (error) {
+        this.logger.error(`Error in /ping: ${error.message}`);
+      }
+    });
+
+    // НОВАЯ КОМАНДА: /status
+    bot.command('status', async (ctx: Context) => {
+      try {
+        await this.onStatus(ctx);
+      } catch (error) {
+        this.logger.error(`Error in /status: ${error.message}`);
+      }
+    });
+
     // Регистрация обработчика текстовых сообщений
     bot.on('text', async (ctx: Context) => {
       try {
@@ -97,6 +115,104 @@ export class TelegramUpdate implements OnModuleInit {
     }
   }
 
+  // НОВЫЙ МЕТОД: команда /ping
+  async onPing(ctx: Context) {
+    const startTime = Date.now();
+    
+    try {
+      // Отправляем первое сообщение
+      const sentMessage = await ctx.reply('🏓 Pinging...');
+      
+      // Вычисляем задержку
+      const latency = Date.now() - startTime;
+      
+      // Обновляем сообщение с результатом
+      await ctx.telegram.editMessageText(
+        ctx.chat?.id,
+        sentMessage.message_id,
+        undefined,
+        `🏓 Pong!\n\n` +
+        `⏱️ Задержка: ${latency}ms\n` +
+        `📍 Регион: Vercel (Supabase)\n` +
+        `⏰ Время: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`
+      );
+      
+      this.logger.log(`⏱️ /ping command: ${latency}ms`);
+    } catch (error) {
+      this.logger.error(`Error in /ping: ${error.message}`);
+      await ctx.reply('❌ Ошибка при выполнении команды /ping');
+    }
+  }
+
+  // НОВЫЙ МЕТОД: команда /status
+  async onStatus(ctx: Context) {
+    const overallStart = Date.now();
+    
+    try {
+      // Отправляем начальное сообщение
+      const message = await ctx.reply('⏳ Проверяю статус...');
+      
+      // 1. Проверяем задержку ответа бота
+      const botLatency = Date.now() - overallStart;
+      
+      // 2. Проверяем задержку БД
+      const dbStart = Date.now();
+      await this.databaseService.getClient()
+        .from('users')
+        .select('count')
+        .limit(1);
+      const dbLatency = Date.now() - dbStart;
+      
+      // 3. Общее время
+      const totalTime = Date.now() - overallStart;
+      
+      // Определяем качество соединения
+      const getQuality = (ms: number) => {
+        if (ms < 100) return '🟢 Отлично';
+        if (ms < 300) return '🟡 Хорошо';
+        if (ms < 500) return '🟠 Средне';
+        return '🔴 Медленно';
+      };
+      
+      // Получаем статистику
+      const dbStats = this.databaseService.getStats();
+      
+      // Формируем отчёт
+      const statusText = 
+        `📊 **Статус системы**\n\n` +
+        `🤖 **Бот (Telegram API)**\n` +
+        `├ Задержка: ${botLatency}ms\n` +
+        `└ Статус: ${getQuality(botLatency)}\n\n` +
+        `💾 **База данных (Supabase)**\n` +
+        `├ Задержка запроса: ${dbLatency}ms\n` +
+        `├ Всего запросов: ${dbStats.queries}\n` +
+        `├ Средняя задержка: ${dbStats.avgTime}ms\n` +
+        `├ Мин/Макс: ${dbStats.minTime === Infinity ? 'N/A' : dbStats.minTime}/${dbStats.maxTime}ms\n` +
+        `└ Статус: ${getQuality(dbLatency)}\n\n` +
+        `⚡ **Общая производительность**\n` +
+        `├ Полное время: ${totalTime}ms\n` +
+        `└ Статус: ${getQuality(totalTime)}\n\n` +
+        `📍 Сервер: Vercel (${process.env.VERCEL_REGION || 'unknown'})\n` +
+        `🗄️ БД: Supabase\n` +
+        `⏰ Время: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`;
+      
+      // Обновляем сообщение
+      await ctx.telegram.editMessageText(
+        ctx.chat?.id,
+        message.message_id,
+        undefined,
+        statusText,
+        { parse_mode: 'Markdown' }
+      );
+      
+      this.logger.log(`⏱️ /status command processed in ${totalTime}ms`);
+      
+    } catch (error: any) {
+      this.logger.error(`Error in /status: ${error.message}`);
+      await ctx.reply(`❌ Ошибка при проверке статуса:\n${error.message}`);
+    }
+  }
+
   async onText(ctx: Context) {
     if (!hasTextMessage(ctx)) {
       return;
@@ -109,9 +225,22 @@ export class TelegramUpdate implements OnModuleInit {
       return;
     }
 
+    const startTime = Date.now();
+
     try {
+      // Сохраняем сообщение в БД
+      const dbStart = Date.now();
       await this.databaseService.saveMessage(ctx.from.id, text);
-      await ctx.reply(`Вы написали: ${text}`);
+      const dbTime = Date.now() - dbStart;
+
+      await ctx.reply(
+        `✅ Сообщение сохранено!\n\n` +
+        `📝 Текст: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"\n` +
+        `⏱️ Время сохранения: ${dbTime}ms`
+      );
+
+      const totalTime = Date.now() - startTime;
+      this.logger.log(`⏱️ Message processing: DB=${dbTime}ms, Total=${totalTime}ms`);
     } catch (error) {
       this.logger.error(`Error processing text message: ${error.message}`);
       await ctx.reply('Произошла ошибка при обработке сообщения.');

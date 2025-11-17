@@ -6,6 +6,14 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 export class DatabaseService implements OnModuleInit {
   private supabase: SupabaseClient;
   private readonly logger = new Logger(DatabaseService.name);
+  
+  // Статистика БД
+  private dbStats = {
+    queries: 0,
+    totalTime: 0,
+    minTime: Infinity,
+    maxTime: 0,
+  };
 
   constructor(private configService: ConfigService) {}
 
@@ -25,9 +33,29 @@ export class DatabaseService implements OnModuleInit {
     return this.supabase;
   }
 
+  private logQuery(operation: string, time: number) {
+    this.dbStats.queries++;
+    this.dbStats.totalTime += time;
+    this.dbStats.minTime = Math.min(this.dbStats.minTime, time);
+    this.dbStats.maxTime = Math.max(this.dbStats.maxTime, time);
+    
+    const emoji = time < 50 ? '🟢' : time < 150 ? '🟡' : '🔴';
+    this.logger.log(`${emoji} DB ${operation}: ${time}ms`);
+  }
+
+  getStats() {
+    return {
+      ...this.dbStats,
+      avgTime: this.dbStats.queries > 0 
+        ? Math.round(this.dbStats.totalTime / this.dbStats.queries) 
+        : 0,
+    };
+  }
+
   async saveUser(telegramId: number, username: string, firstName: string) {
+    const startTime = Date.now();
+    
     try {
-      // ИСПРАВЛЕНО: используем upsert с правильным onConflict
       const { data, error } = await this.supabase
         .from('users')
         .upsert(
@@ -38,14 +66,16 @@ export class DatabaseService implements OnModuleInit {
             last_seen: new Date().toISOString(),
           },
           {
-            onConflict: 'telegram_id', // указываем по какому полю делать upsert
-            ignoreDuplicates: false, // обновляем существующие записи
+            onConflict: 'telegram_id',
+            ignoreDuplicates: false,
           }
         )
         .select();
 
+      const queryTime = Date.now() - startTime;
+      this.logQuery('saveUser', queryTime);
+
       if (error) {
-        // Если все еще ошибка - логируем, но не бросаем исключение
         this.logger.warn(`⚠️ User upsert warning: ${error.message}`);
         return null;
       }
@@ -53,11 +83,13 @@ export class DatabaseService implements OnModuleInit {
       this.logger.log(`✅ User saved/updated: ${telegramId}`);
       return data;
     } catch (error: any) {
-      // Ловим ошибку дубликата и просто обновляем запись
+      const queryTime = Date.now() - startTime;
+      this.logQuery('saveUser(error)', queryTime);
+      
       if (error.code === '23505') {
         this.logger.log(`🔄 User already exists, updating: ${telegramId}`);
         
-        // Обновляем существующую запись
+        const updateStart = Date.now();
         const { data, error: updateError } = await this.supabase
           .from('users')
           .update({
@@ -68,6 +100,9 @@ export class DatabaseService implements OnModuleInit {
           .eq('telegram_id', telegramId)
           .select();
 
+        const updateTime = Date.now() - updateStart;
+        this.logQuery('updateUser', updateTime);
+
         if (updateError) {
           this.logger.error(`❌ Error updating user: ${updateError.message}`);
           return null;
@@ -77,18 +112,22 @@ export class DatabaseService implements OnModuleInit {
       }
       
       this.logger.error(`❌ Error saving user: ${error.message}`);
-      // НЕ бросаем ошибку, чтобы не крашить весь процесс
       return null;
     }
   }
 
   async getUser(telegramId: number) {
+    const startTime = Date.now();
+    
     try {
       const { data, error } = await this.supabase
         .from('users')
         .select('*')
         .eq('telegram_id', telegramId)
         .single();
+
+      const queryTime = Date.now() - startTime;
+      this.logQuery('getUser', queryTime);
 
       if (error && error.code !== 'PGRST116') {
         this.logger.error(`❌ Error getting user: ${error.message}`);
@@ -97,12 +136,17 @@ export class DatabaseService implements OnModuleInit {
       
       return data;
     } catch (error: any) {
+      const queryTime = Date.now() - startTime;
+      this.logQuery('getUser(error)', queryTime);
+      
       this.logger.error(`❌ Error getting user: ${error.message}`);
       return null;
     }
   }
 
   async saveMessage(telegramId: number, message: string) {
+    const startTime = Date.now();
+    
     try {
       const { data, error } = await this.supabase
         .from('messages')
@@ -113,12 +157,17 @@ export class DatabaseService implements OnModuleInit {
         })
         .select();
 
+      const queryTime = Date.now() - startTime;
+      this.logQuery('saveMessage', queryTime);
+
       if (error) throw error;
       this.logger.log(`✅ Message saved from: ${telegramId}`);
       return data;
     } catch (error: any) {
+      const queryTime = Date.now() - startTime;
+      this.logQuery('saveMessage(error)', queryTime);
+      
       this.logger.error(`❌ Error saving message: ${error.message}`);
-      // НЕ бросаем ошибку
       return null;
     }
   }
