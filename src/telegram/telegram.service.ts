@@ -8,7 +8,6 @@ export class TelegramService implements OnModuleInit {
   private bot: Telegraf;
   private readonly logger = new Logger(TelegramService.name);
   
-  // Статистика для мониторинга
   private stats = {
     totalRequests: 0,
     totalTime: 0,
@@ -62,7 +61,6 @@ export class TelegramService implements OnModuleInit {
     const startTime = Date.now();
     
     try {
-      // Логируем входящий запрос
       const updateType = this.getUpdateType(update);
       const userId = this.getUserId(update);
       
@@ -70,16 +68,12 @@ export class TelegramService implements OnModuleInit {
         `📨 Incoming update: Type=${updateType}, User=${userId}, UpdateID=${update.update_id}`
       );
       
-      // Обрабатываем обновление
       await this.bot.handleUpdate(update);
       
-      // Вычисляем время обработки
       const processingTime = Date.now() - startTime;
       
-      // Обновляем статистику
       this.updateStats(processingTime);
       
-      // Логируем результат с цветовой индикацией
       const emoji = processingTime < 100 ? '🟢' : processingTime < 300 ? '🟡' : '🔴';
       this.logger.log(
         `${emoji} Update processed: ${processingTime}ms (avg: ${Math.round(this.stats.totalTime / this.stats.totalRequests)}ms, min: ${this.stats.minTime}ms, max: ${this.stats.maxTime}ms)`

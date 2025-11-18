@@ -7,7 +7,6 @@ export class DatabaseService implements OnModuleInit {
   private supabase: SupabaseClient;
   private readonly logger = new Logger(DatabaseService.name);
   
-  // Статистика БД
   private dbStats = {
     queries: 0,
     totalTime: 0,

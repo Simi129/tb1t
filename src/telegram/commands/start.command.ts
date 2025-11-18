@@ -21,11 +21,22 @@ export class StartCommand {
     try {
       await this.databaseService.saveUser(telegramId, username, firstName);
       
-      await ctx.reply(
+      const welcomeText = 
+        `🔥 *ProspectTrade VIP*\n\n` +
         `Привет, ${firstName}! 👋\n\n` +
-        `Добро пожаловать в бота!\n` +
-        `Используй /help для списка команд.`
-      );
+        `*Access\\. Precision\\. Excellence\\.*\n` +
+        `✨ Handpicked trading opportunities\n` +
+        `🔒 Private insights, unavailable to the public\n` +
+        `🤝 Personal guidance from elite market experts\n\n` +
+        `Membership is privilege\\.\n` +
+        `Welcome to the next level\\. 🌍\n\n` +
+        `📊 *Доступные команды:*\n` +
+        `/help \\- Полная справка\n` +
+        `/ping \\- Проверить задержку\n` +
+        `/status \\- Диагностика системы\n` +
+        `/imagine \\- Генерация изображений 🍌`;
+
+      await ctx.reply(welcomeText, { parse_mode: 'MarkdownV2' });
       
       this.logger.log(`User ${telegramId} started the bot`);
     } catch (error) {
