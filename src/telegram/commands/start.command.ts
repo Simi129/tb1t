@@ -23,7 +23,7 @@ export class StartCommand {
       
       const welcomeText = 
         `🔥 *ProspectTrade VIP*\n\n` +
-        `Привет, ${firstName}! 👋\n\n` +
+        `Привет, ${firstName}\\! 👋\n\n` +
         `*Access\\. Precision\\. Excellence\\.*\n` +
         `✨ Handpicked trading opportunities\n` +
         `🔒 Private insights, unavailable to the public\n` +
