@@ -30,6 +30,7 @@ export interface PaymentCallbackData {
 
 export enum SubscriptionPlanId {
   FREE = 'free',
+  TEST = 'test',
   BASIC = 'basic',
   PRO = 'pro',
   PREMIUM = 'premium',
@@ -50,6 +51,23 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, SubscriptionPlan> = 
       dailyGenerations: 3,
       imageGenerations: 1,
       voiceAnalysis: 2,
+    },
+  },
+  [SubscriptionPlanId.TEST]: {
+    id: SubscriptionPlanId.TEST,
+    name: '🧪 Тестовый',
+    description: 'Для проверки платежей - 1 Star',
+    price: 1, // 1 Star для теста
+    duration: 1, // 1 день
+    features: [
+      '✅ 10 генераций в день',
+      '✅ Тест платёжной системы',
+      '✅ Срок: 1 день',
+    ],
+    limits: {
+      dailyGenerations: 10,
+      imageGenerations: 5,
+      voiceAnalysis: 5,
     },
   },
   [SubscriptionPlanId.BASIC]: {
