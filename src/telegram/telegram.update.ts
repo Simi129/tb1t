@@ -199,13 +199,13 @@ export class TelegramUpdate implements OnModuleInit {
       const subscription = await this.subscriptionService.getUserSubscription(ctx.from.id);
       this.logger.log(`✅ Subscription: ${subscription ? 'active' : 'none'}`);
 
-      let profileText = `👤 **Ваш профиль**\n\n`;
+      let profileText = `👤 Ваш профиль\n\n`;
       profileText += `ID: ${user.telegram_id}\n`;
       profileText += `Username: @${user.username || 'не указан'}\n`;
       profileText += `Имя: ${user.first_name}\n`;
       profileText += `Последний визит: ${new Date(user.last_seen).toLocaleString('ru-RU')}\n\n`;
       
-      profileText += `💎 **Подписка:** ${plan.name}\n`;
+      profileText += `💎 Подписка: ${plan.name}\n`;
       
       if (subscription && subscription.isActive) {
         const daysLeft = Math.ceil(
@@ -216,7 +216,6 @@ export class TelegramUpdate implements OnModuleInit {
 
       this.logger.log(`📤 Sending profile message`);
       await ctx.reply(profileText, { 
-        parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
             [
