@@ -179,7 +179,11 @@ export class TelegramUpdate implements OnModuleInit {
     }
 
     try {
+      this.logger.log(`👤 Profile request from user: ${ctx.from.id}`);
+      
+      // Получаем пользователя
       const user = await this.databaseService.getUser(ctx.from.id);
+      this.logger.log(`✅ User data retrieved: ${user ? 'found' : 'not found'}`);
       
       if (!user) {
         await ctx.reply('Пользователь не найден. Используйте /start');
@@ -187,8 +191,13 @@ export class TelegramUpdate implements OnModuleInit {
       }
 
       // Получаем информацию о подписке
+      this.logger.log(`📊 Getting subscription plan for user: ${ctx.from.id}`);
       const plan = await this.subscriptionService.getCurrentPlan(ctx.from.id);
+      this.logger.log(`✅ Current plan: ${plan.name}`);
+      
+      this.logger.log(`📊 Getting subscription details for user: ${ctx.from.id}`);
       const subscription = await this.subscriptionService.getUserSubscription(ctx.from.id);
+      this.logger.log(`✅ Subscription: ${subscription ? 'active' : 'none'}`);
 
       let profileText = `👤 **Ваш профиль**\n\n`;
       profileText += `ID: ${user.telegram_id}\n`;
@@ -205,6 +214,7 @@ export class TelegramUpdate implements OnModuleInit {
         profileText += `⏰ Осталось: ${daysLeft} дней\n`;
       }
 
+      this.logger.log(`📤 Sending profile message`);
       await ctx.reply(profileText, { 
         parse_mode: 'Markdown',
         reply_markup: {
@@ -218,9 +228,16 @@ export class TelegramUpdate implements OnModuleInit {
           ],
         },
       });
+      
+      this.logger.log(`✅ Profile command completed successfully`);
     } catch (error: any) {
-      this.logger.error(`Error in profile command: ${error.message}`);
-      await ctx.reply('Произошла ошибка при получении профиля.');
+      this.logger.error(`❌ Error in profile command: ${error.message}`);
+      this.logger.error(`❌ Error stack: ${error.stack}`);
+      await ctx.reply(
+        '❌ Произошла ошибка при получении профиля.\n\n' +
+        `Ошибка: ${error.message}\n\n` +
+        'Попробуйте позже или свяжитесь с поддержкой.'
+      );
     }
   }
 
