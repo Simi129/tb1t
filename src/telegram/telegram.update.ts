@@ -5,9 +5,8 @@ import {
   Command, 
   On, 
   Hears,
-  InjectBot,
 } from 'nestjs-telegraf';
-import { Context, Telegraf } from 'telegraf';
+import { Context } from 'telegraf';
 import { Injectable, Logger } from '@nestjs/common';
 import { StartCommand } from './commands/start.command';
 import { HelpCommand } from './commands/help.command';
@@ -31,7 +30,6 @@ export class TelegramUpdate {
   private userStates = new Map<number, string>();
 
   constructor(
-    @InjectBot() private readonly bot: Telegraf<Context>,
     private readonly startCommand: StartCommand,
     private readonly helpCommand: HelpCommand,
     private readonly subscriptionCommand: SubscriptionCommand,
