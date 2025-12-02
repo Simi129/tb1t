@@ -4,18 +4,17 @@ import axios, { AxiosInstance } from 'axios';
 
 export interface RunwayVideoOptions {
   prompt: string;
-  videoUrl: string;
-  callBackUrl?: string;
-  watermark?: string;
-  uploadCn?: boolean;
+  imageUrl?: string;
+  duration?: 5 | 10;
+  quality?: '720p' | '1080p';
   aspectRatio?: '16:9' | '9:16' | '4:3' | '3:4' | '1:1' | '21:9';
-  seed?: number;
-  referenceImageUrl?: string;
+  waterMark?: string;
+  callBackUrl?: string;
 }
 
 export interface RunwayTaskResponse {
   code: number;
-  message: string;
+  msg: string;
   data: {
     taskId: string;
   };
@@ -23,16 +22,18 @@ export interface RunwayTaskResponse {
 
 export interface RunwayTaskStatus {
   code: number;
-  message: string;
+  msg: string;
   data: {
     taskId: string;
-    status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
-    videoUrl?: string;
-    thumbnailUrl?: string;
-    progress?: number;
-    error?: string;
-    createdAt: string;
-    updatedAt: string;
+    state: 'wait' | 'queueing' | 'generating' | 'success' | 'fail';
+    generateTime?: string;
+    videoInfo?: {
+      videoId: string;
+      videoUrl: string;
+      imageUrl: string;
+    };
+    expireFlag?: number;
+    failMsg?: string;
   };
 }
 
@@ -75,21 +76,28 @@ export class RunwayService {
     
     try {
       this.logger.log(`🎬 Starting video generation: "${options.prompt.substring(0, 50)}..."`);
-      this.logger.debug(`Video URL: ${options.videoUrl}`);
 
-      const requestBody = {
+      const requestBody: any = {
         prompt: options.prompt,
-        videoUrl: options.videoUrl,
-        ...(options.callBackUrl && { callBackUrl: options.callBackUrl }),
-        ...(options.watermark && { watermark: options.watermark }),
-        ...(options.uploadCn !== undefined && { uploadCn: options.uploadCn }),
-        ...(options.aspectRatio && { aspectRatio: options.aspectRatio }),
-        ...(options.seed && { seed: options.seed }),
-        ...(options.referenceImageUrl && { referenceImageUrl: options.referenceImageUrl }),
+        duration: options.duration || 5,
+        quality: options.quality || '720p',
+        aspectRatio: options.aspectRatio || '16:9',
+        waterMark: options.waterMark || '',
       };
 
+      if (options.imageUrl) {
+        requestBody.imageUrl = options.imageUrl;
+        this.logger.debug(`Using image URL: ${options.imageUrl}`);
+      }
+
+      if (options.callBackUrl) {
+        requestBody.callBackUrl = options.callBackUrl;
+      }
+
+      this.logger.debug(`Request body: ${JSON.stringify(requestBody)}`);
+
       const response = await this.apiClient.post<RunwayTaskResponse>(
-        '/runway/aleph/generate',
+        '/generate',
         requestBody
       );
 
@@ -110,7 +118,7 @@ export class RunwayService {
           `❌ Runway API error (${processingTime}ms): ${error.response.status} - ${JSON.stringify(error.response.data)}`
         );
         throw new Error(
-          `Runway API error: ${error.response.data?.message || error.response.statusText}`
+          `Runway API error: ${error.response.data?.msg || error.response.statusText}`
         );
       } else if (error.request) {
         this.logger.error(`❌ Network error (${processingTime}ms): No response from Runway API`);
@@ -127,12 +135,12 @@ export class RunwayService {
       this.logger.debug(`🔍 Checking task status: ${taskId}`);
 
       const response = await this.apiClient.get<RunwayTaskStatus>(
-        `/runway/aleph/task/${taskId}`
+        `/record-detail?taskId=${taskId}`
       );
 
       if (response.data.code === 200 && response.data.data) {
         const taskData = response.data.data;
-        this.logger.debug(`📊 Task ${taskId} status: ${taskData.status}`);
+        this.logger.debug(`📊 Task ${taskId} status: ${taskData.state}`);
         return taskData;
       } else {
         throw new Error(`Unexpected response: ${JSON.stringify(response.data)}`);
@@ -143,7 +151,7 @@ export class RunwayService {
           `❌ Error checking task status: ${error.response.status} - ${JSON.stringify(error.response.data)}`
         );
         throw new Error(
-          `Failed to check task status: ${error.response.data?.message || error.response.statusText}`
+          `Failed to check task status: ${error.response.data?.msg || error.response.statusText}`
         );
       }
       throw error;
@@ -152,27 +160,26 @@ export class RunwayService {
 
   async waitForCompletion(
     taskId: string,
-    maxAttempts: number = 60,
-    intervalMs: number = 5000
+    maxAttempts: number = 40,
+    intervalMs: number = 30000
   ): Promise<RunwayTaskStatus['data']> {
-    this.logger.log(`⏳ Waiting for task ${taskId} to complete (max ${maxAttempts} attempts)`);
+    this.logger.log(`⏳ Waiting for task ${taskId} to complete (max ${maxAttempts} attempts, checking every 30s)`);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const status = await this.getTaskStatus(taskId);
 
-      if (status.status === 'SUCCESS') {
+      if (status.state === 'success') {
         this.logger.log(`✅ Task ${taskId} completed successfully after ${attempt} attempts`);
         return status;
       }
 
-      if (status.status === 'FAILED') {
-        this.logger.error(`❌ Task ${taskId} failed: ${status.error}`);
-        throw new Error(`Video generation failed: ${status.error || 'Unknown error'}`);
+      if (status.state === 'fail') {
+        this.logger.error(`❌ Task ${taskId} failed: ${status.failMsg}`);
+        throw new Error(`Video generation failed: ${status.failMsg || 'Unknown error'}`);
       }
 
-      const progressInfo = status.progress ? ` (${status.progress}%)` : '';
       this.logger.debug(
-        `⏳ Task ${taskId} still ${status.status}${progressInfo} - Attempt ${attempt}/${maxAttempts}`
+        `⏳ Task ${taskId} status: ${status.state} - Attempt ${attempt}/${maxAttempts}`
       );
 
       if (attempt < maxAttempts) {
@@ -187,11 +194,11 @@ export class RunwayService {
     const taskId = await this.generateVideo(options);
     const result = await this.waitForCompletion(taskId);
 
-    if (!result.videoUrl) {
+    if (!result.videoInfo?.videoUrl) {
       throw new Error('Video URL not found in completed task');
     }
 
-    return result.videoUrl;
+    return result.videoInfo.videoUrl;
   }
 
   private sleep(ms: number): Promise<void> {

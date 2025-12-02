@@ -1,9 +1,5 @@
 import { Markup } from 'telegraf';
 
-/**
- * 🎹 Конфигурация клавиатуры бота
- */
-
 export const KEYBOARD_BUTTONS = {
   // Главное меню
   PROFILE: '👤 Профиль',
@@ -21,7 +17,8 @@ export const KEYBOARD_BUTTONS = {
   
   // Подменю Видео
   VIDEO_ANALYZE: '🎥 Анализ видео',
-  VIDEO_GENERATE: '🎬 Создать видео с AI',
+  VIDEO_GENERATE_FROM_IMAGE: '🎬 Видео из изображения',
+  VIDEO_GENERATE_FROM_TEXT: '✨ Видео из текста',
   VIDEO_BACK: '⬅️ Назад',
   
   // Подменю Аудио
@@ -30,9 +27,6 @@ export const KEYBOARD_BUTTONS = {
   AUDIO_BACK: '⬅️ Назад',
 } as const;
 
-/**
- * Главное меню
- */
 export const mainKeyboard = Markup.keyboard([
   [KEYBOARD_BUTTONS.PROFILE],
   [KEYBOARD_BUTTONS.GEMINI, KEYBOARD_BUTTONS.IMAGE_AI],
@@ -42,9 +36,6 @@ export const mainKeyboard = Markup.keyboard([
   .resize()
   .persistent();
 
-/**
- * Меню Gemini AI
- */
 export const geminiKeyboard = Markup.keyboard([
   [KEYBOARD_BUTTONS.GEMINI_CHAT],
   [KEYBOARD_BUTTONS.GEMINI_ANALYZE_IMAGE],
@@ -53,20 +44,15 @@ export const geminiKeyboard = Markup.keyboard([
   .resize()
   .persistent();
 
-/**
- * Меню Видео с ИИ
- */
 export const videoKeyboard = Markup.keyboard([
   [KEYBOARD_BUTTONS.VIDEO_ANALYZE],
-  [KEYBOARD_BUTTONS.VIDEO_GENERATE],
+  [KEYBOARD_BUTTONS.VIDEO_GENERATE_FROM_TEXT],
+  [KEYBOARD_BUTTONS.VIDEO_GENERATE_FROM_IMAGE],
   [KEYBOARD_BUTTONS.VIDEO_BACK],
 ])
   .resize()
   .persistent();
 
-/**
- * Меню Аудио с ИИ
- */
 export const audioKeyboard = Markup.keyboard([
   [KEYBOARD_BUTTONS.AUDIO_TRANSCRIBE],
   [KEYBOARD_BUTTONS.AUDIO_ANALYZE],
@@ -75,7 +61,4 @@ export const audioKeyboard = Markup.keyboard([
   .resize()
   .persistent();
 
-/**
- * Вспомогательная функция для удаления клавиатуры
- */
 export const removeKeyboard = Markup.removeKeyboard();
