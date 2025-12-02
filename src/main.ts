@@ -24,7 +24,7 @@ async function bootstrap() {
   
   console.log(`🚀 Бот запущен на порту ${port}`);
   console.log(`📝 Окружение: ${process.env.NODE_ENV || 'production'}`);
-  console.log(`🌐 Railway URL: https://твой-проект.up.railway.app`);
+  console.log(`🌐 Railway URL: https://tb1t-production.up.railway.app`);
   
   // Graceful shutdown
   process.on('SIGTERM', async () => {
