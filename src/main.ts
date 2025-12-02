@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 
-// Для локальной разработки
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug'],
@@ -17,18 +16,31 @@ async function bootstrap() {
 
   app.enableCors();
 
+  // Railway автоматически устанавливает PORT
   const port = process.env.PORT || 3000;
-  await app.listen(port);
+  
+  // ВАЖНО: 0.0.0.0 необходимо для Railway
+  await app.listen(port, '0.0.0.0');
   
   console.log(`🚀 Бот запущен на порту ${port}`);
-  console.log(`📝 Окружение: ${process.env.NODE_ENV || 'development'}`);
-}
-
-// Запускаем ТОЛЬКО для локальной разработки
-// НЕ запускаем на Vercel!
-if (require.main === module) {
-  bootstrap().catch(err => {
-    console.error('Failed to start application:', err);
-    process.exit(1);
+  console.log(`📝 Окружение: ${process.env.NODE_ENV || 'production'}`);
+  console.log(`🌐 Railway URL: https://твой-проект.up.railway.app`);
+  
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('📛 SIGTERM получен, завершаем работу...');
+    await app.close();
+    process.exit(0);
+  });
+  
+  process.on('SIGINT', async () => {
+    console.log('📛 SIGINT получен, завершаем работу...');
+    await app.close();
+    process.exit(0);
   });
 }
+
+bootstrap().catch(err => {
+  console.error('❌ Критическая ошибка запуска:', err);
+  process.exit(1);
+});

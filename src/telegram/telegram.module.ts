@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { TelegramUpdate } from './telegram.update';
+import { TelegramController } from './telegram.controller';
 import { StartCommand } from './commands/start.command';
 import { HelpCommand } from './commands/help.command';
 import { SubscriptionCommand } from './commands/subscription.command';
@@ -10,6 +11,7 @@ import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [DatabaseModule, AiModule],
+  controllers: [TelegramController], // Добавили контроллер для webhook
   providers: [
     TelegramService,
     TelegramUpdate,
