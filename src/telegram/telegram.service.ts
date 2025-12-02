@@ -41,7 +41,7 @@ export class TelegramService implements OnModuleInit {
     // 🔴 ВАЖНО: Замени на свой Railway URL после деплоя
     // Формат: https://твой-проект.up.railway.app/api/telegram
     // Или используй переменную окружения WEBHOOK_URL
-    const webhookUrl = process.env.WEBHOOK_URL || 'https://твой-проект.up.railway.app/api/telegram';
+    const webhookUrl = process.env.WEBHOOK_URL || 'https://tb1t-production.up.railway.app/api/telegram';
     
     this.logger.log(`🔗 Устанавливаем webhook: ${webhookUrl}`);
     
