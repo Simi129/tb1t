@@ -12,6 +12,7 @@ export const KEYBOARD_BUTTONS = {
   AUDIO_AI: '🎙 Аудио с ИИ',
   IMAGE_AI: '🖼 Генерация изображений',
   HELP: '❓ Помощь',
+  MAIN_MENU: '🏠 Главное меню',
   
   // Подменю Gemini
   GEMINI_CHAT: '💬 Чат с Gemini',

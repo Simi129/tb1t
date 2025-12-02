@@ -77,6 +77,9 @@ export class TelegramHandlers {
         if (text === KEYBOARD_BUTTONS.HELP) {
           return await this.handleHelp(ctx);
         }
+        if (text === KEYBOARD_BUTTONS.MAIN_MENU) {
+          return await this.handleMainMenu(ctx);
+        }
 
         // Кнопки подменю Gemini
         if (text === KEYBOARD_BUTTONS.GEMINI_CHAT) {
@@ -228,15 +231,17 @@ export class TelegramHandlers {
         return;
       }
 
+      const lastSeen = new Date(user.last_seen).toLocaleString('ru-RU');
+      
       const profileText = 
         `👤 *Ваш профиль*\n\n` +
         `🆔 Telegram ID: \`${user.telegram_id}\`\n` +
         `👤 Имя: ${user.first_name}\n` +
         `📝 Username: @${user.username || 'не указан'}\n` +
-        `📅 Последняя активность: ${new Date(user.last_seen).toLocaleString('ru-RU')}`;
+        `📅 Последняя активность: ${lastSeen.replace(/[.,:]/g, '\\$&')}`;
 
       await ctx.reply(profileText, { 
-        parse_mode: 'Markdown',
+        parse_mode: 'MarkdownV2',
         ...mainKeyboard
       });
     } catch (error) {
@@ -293,6 +298,22 @@ export class TelegramHandlers {
       parse_mode: 'Markdown',
       ...mainKeyboard
     });
+  }
+
+  private async handleMainMenu(ctx: Context) {
+    if (!ctx.from) return;
+    
+    // Сбрасываем состояние пользователя
+    this.userStates.delete(ctx.from.id);
+    
+    await ctx.reply(
+      '🏠 *Главное меню*\n\n' +
+      'Выберите нужный раздел из меню ниже 👇',
+      {
+        parse_mode: 'Markdown',
+        ...mainKeyboard
+      }
+    );
   }
 
   // ============================================
