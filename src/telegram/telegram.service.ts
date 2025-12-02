@@ -1,7 +1,8 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Telegraf } from 'telegraf';
 import { DatabaseService } from '../database/database.service';
+import { TelegramHandlers } from './telegram.handlers';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -18,6 +19,8 @@ export class TelegramService implements OnModuleInit {
   constructor(
     private configService: ConfigService,
     private databaseService: DatabaseService,
+    @Inject(forwardRef(() => TelegramHandlers))
+    private telegramHandlers: TelegramHandlers,
   ) {
     const token = this.configService.get<string>('telegram.token');
     if (!token) {
@@ -38,9 +41,6 @@ export class TelegramService implements OnModuleInit {
   }
 
   private async setupWebhook() {
-    // 🔴 ВАЖНО: Замени на свой Railway URL после деплоя
-    // Формат: https://твой-проект.up.railway.app/api/telegram
-    // Или используй переменную окружения WEBHOOK_URL
     const webhookUrl = process.env.WEBHOOK_URL || 'https://tb1t-production.up.railway.app/api/telegram';
     
     this.logger.log(`🔗 Устанавливаем webhook: ${webhookUrl}`);
@@ -87,8 +87,11 @@ export class TelegramService implements OnModuleInit {
         `📨 Обновление: Тип=${updateType}, User=${userId}, ID=${update.update_id}`
       );
       
-      // Обрабатываем обновление через Telegraf
-      await this.bot.handleUpdate(update);
+      // Создаём контекст из обновления
+      const ctx = await this.createContext(update);
+      
+      // Передаём в обработчик
+      await this.telegramHandlers.handleUpdate(ctx);
       
       const processingTime = Date.now() - startTime;
       this.updateStats(processingTime);
@@ -107,6 +110,35 @@ export class TelegramService implements OnModuleInit {
       );
       throw error;
     }
+  }
+
+  /**
+   * Создаём Telegraf Context из update объекта
+   */
+  private async createContext(update: any): Promise<any> {
+    // Telegraf использует bot.handleUpdate для создания контекста
+    // Но мы можем создать его вручную
+    const ctx = {
+      telegram: this.bot.telegram,
+      bot: this.bot,
+      update: update,
+      message: update.message,
+      from: update.message?.from || update.callback_query?.from,
+      chat: update.message?.chat || update.callback_query?.message?.chat,
+      
+      // Методы для ответа
+      reply: async (text: string, extra?: any) => {
+        if (!ctx.chat) throw new Error('No chat in context');
+        return await this.bot.telegram.sendMessage(ctx.chat.id, text, extra);
+      },
+      
+      replyWithPhoto: async (photo: any, extra?: any) => {
+        if (!ctx.chat) throw new Error('No chat in context');
+        return await this.bot.telegram.sendPhoto(ctx.chat.id, photo, extra);
+      },
+    };
+    
+    return ctx;
   }
 
   private getUpdateType(update: any): string {
