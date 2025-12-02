@@ -21,6 +21,7 @@ export const KEYBOARD_BUTTONS = {
   
   // Подменю Видео
   VIDEO_ANALYZE: '🎥 Анализ видео',
+  VIDEO_GENERATE: '🎬 Создать видео с AI',
   VIDEO_BACK: '⬅️ Назад',
   
   // Подменю Аудио
@@ -57,6 +58,7 @@ export const geminiKeyboard = Markup.keyboard([
  */
 export const videoKeyboard = Markup.keyboard([
   [KEYBOARD_BUTTONS.VIDEO_ANALYZE],
+  [KEYBOARD_BUTTONS.VIDEO_GENERATE],
   [KEYBOARD_BUTTONS.VIDEO_BACK],
 ])
   .resize()

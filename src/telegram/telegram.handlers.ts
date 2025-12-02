@@ -5,6 +5,7 @@ import { StartCommand } from './commands/start.command';
 import { HelpCommand } from './commands/help.command';
 import { SubscriptionCommand } from './commands/subscription.command';
 import { GeminiService } from '../ai/gemini.service';
+import { RunwayService } from '../runway/runway.service';
 import { DatabaseService } from '../database/database.service';
 import { 
   KEYBOARD_BUTTONS, 
@@ -14,18 +15,31 @@ import {
   audioKeyboard 
 } from './keyboard.config';
 
+/**
+ * Интерфейс для отслеживания состояния генерации видео
+ */
+interface UserVideoState {
+  state: string;
+  videoUrl?: string;
+  fileId?: string;
+}
+
 @Injectable()
 export class TelegramHandlers {
   private readonly logger = new Logger(TelegramHandlers.name);
   
   // Для отслеживания состояния пользователей
   private userStates = new Map<number, string>();
+  
+  // Для отслеживания состояния генерации видео
+  private videoGenerationStates = new Map<number, UserVideoState>();
 
   constructor(
     private readonly startCommand: StartCommand,
     private readonly helpCommand: HelpCommand,
     private readonly subscriptionCommand: SubscriptionCommand,
     private readonly geminiService: GeminiService,
+    private readonly runwayService: RunwayService,
     private readonly databaseService: DatabaseService,
   ) {}
 
@@ -95,6 +109,9 @@ export class TelegramHandlers {
         // Кнопки подменю Видео
         if (text === KEYBOARD_BUTTONS.VIDEO_ANALYZE) {
           return await this.handleVideoAnalyze(ctx);
+        }
+        if (text === KEYBOARD_BUTTONS.VIDEO_GENERATE) {
+          return await this.handleVideoGenerate(ctx);
         }
         if (text === KEYBOARD_BUTTONS.VIDEO_BACK) {
           return await this.handleVideoBack(ctx);
@@ -171,6 +188,7 @@ export class TelegramHandlers {
       `✅ Бот работает\n` +
       `⏱ Uptime: ${hours}ч ${minutes}м\n` +
       `🤖 Gemini AI: Активен\n` +
+      `🎬 Runway AI: Активен\n` +
       `💾 База данных: Подключена`;
 
     await ctx.reply(statusText, {
@@ -266,7 +284,9 @@ export class TelegramHandlers {
   private async handleVideoAI(ctx: Context) {
     const text = 
       `🎬 *Видео с ИИ*\n\n` +
-      `🎥 Отправьте видео для анализа содержания`;
+      `Выберите действие:\n` +
+      `🎥 Анализ видео - описание содержимого\n` +
+      `🎬 Создать видео с AI - трансформация видео с помощью Runway`;
 
     await ctx.reply(text, {
       parse_mode: 'Markdown',
@@ -277,8 +297,9 @@ export class TelegramHandlers {
   private async handleAudioAI(ctx: Context) {
     const text = 
       `🎙 *Аудио с ИИ*\n\n` +
-      `📝 Транскрибация - перевод речи в текст\n` +
-      `🎧 Анализ - описание содержания аудио`;
+      `Выберите действие:\n` +
+      `📝 Транскрибация - перевод в текст\n` +
+      `🎧 Анализ аудио - детальный разбор`;
 
     await ctx.reply(text, {
       parse_mode: 'Markdown',
@@ -289,10 +310,10 @@ export class TelegramHandlers {
   private async handleImageAI(ctx: Context) {
     const text = 
       `🖼 *Генерация изображений*\n\n` +
-      `🍌 Используйте команду:\n` +
-      `\`/imagine ваше описание\`\n\n` +
-      `Например:\n` +
-      `\`/imagine кот-космонавт в открытом космосе\``;
+      `Используйте команду:\n` +
+      `/imagine [описание]\n\n` +
+      `Пример:\n` +
+      `/imagine красивый закат над океаном`;
 
     await ctx.reply(text, {
       parse_mode: 'Markdown',
@@ -303,16 +324,13 @@ export class TelegramHandlers {
   private async handleMainMenu(ctx: Context) {
     if (!ctx.from) return;
     
-    // Сбрасываем состояние пользователя
+    // Очистка всех состояний
     this.userStates.delete(ctx.from.id);
+    this.videoGenerationStates.delete(ctx.from.id);
     
     await ctx.reply(
-      '🏠 *Главное меню*\n\n' +
-      'Выберите нужный раздел из меню ниже 👇',
-      {
-        parse_mode: 'Markdown',
-        ...mainKeyboard
-      }
+      '🏠 Главное меню',
+      mainKeyboard
     );
   }
 
@@ -380,10 +398,37 @@ export class TelegramHandlers {
     );
   }
 
+  /**
+   * 🎬 НОВОЕ: Обработчик генерации видео с Runway AI
+   */
+  private async handleVideoGenerate(ctx: Context) {
+    if (!ctx.from) return;
+    
+    this.userStates.set(ctx.from.id, 'video_generate');
+    this.videoGenerationStates.set(ctx.from.id, { state: 'waiting_for_video' });
+    
+    await ctx.reply(
+      '🎬 *Генерация видео с Runway AI*\n\n' +
+      '📹 Отправьте исходное видео (макс. 5 секунд будет обработано)\n\n' +
+      '💡 Затем опишите, как его трансформировать!\n\n' +
+      '✨ *Примеры трансформаций:*\n' +
+      '• "Transform into a dreamy watercolor painting"\n' +
+      '• "Add snow falling gently"\n' +
+      '• "Make it look like an old VHS tape"\n' +
+      '• "Turn into cyberpunk neon style"\n\n' +
+      'Для отмены нажмите "⬅️ Назад"',
+      { 
+        parse_mode: 'Markdown',
+        ...videoKeyboard
+      }
+    );
+  }
+
   private async handleVideoBack(ctx: Context) {
     if (!ctx.from) return;
     
     this.userStates.delete(ctx.from.id);
+    this.videoGenerationStates.delete(ctx.from.id);
     
     await ctx.reply('⬅️ Возврат в главное меню', mainKeyboard);
   }
@@ -511,12 +556,53 @@ export class TelegramHandlers {
     }
   }
 
+  /**
+   * 🎬 ОБНОВЛЕНО: Обработчик видео с поддержкой генерации через Runway
+   */
   private async handleVideo(ctx: Context) {
     if (!ctx.from || !ctx.message || !('video' in ctx.message)) return;
 
     const userState = this.userStates.get(ctx.from.id);
+    const videoGenState = this.videoGenerationStates.get(ctx.from.id);
 
-    if (userState === 'video_analyze') {
+    // 🎬 НОВОЕ: Генерация видео с Runway
+    if (userState === 'video_generate' && videoGenState?.state === 'waiting_for_video') {
+      try {
+        await ctx.reply('📹 Получил видео! Загружаю... ⏳');
+
+        const video = ctx.message.video;
+        const fileLink = await ctx.telegram.getFileLink(video.file_id);
+
+        // Сохраняем URL и file_id видео
+        this.videoGenerationStates.set(ctx.from.id, {
+          state: 'waiting_for_prompt',
+          videoUrl: fileLink.href,
+          fileId: video.file_id,
+        });
+
+        await ctx.reply(
+          '✅ Видео получено!\n\n' +
+          '📝 Теперь опишите, как его трансформировать:\n\n' +
+          '💡 *Примеры:*\n' +
+          '• Transform into a dreamy watercolor painting style\n' +
+          '• Add dramatic cyberpunk neon lighting\n' +
+          '• Make it look like vintage 1980s VHS footage\n' +
+          '• Turn into anime style with smooth movements\n\n' +
+          '⚡️ Чем детальнее описание, тем лучше результат!',
+          { 
+            parse_mode: 'Markdown',
+            ...videoKeyboard
+          }
+        );
+
+        this.logger.log(`Video received for generation from user ${ctx.from.id}`);
+      } catch (error) {
+        this.logger.error(`Error receiving video: ${error.message}`);
+        await ctx.reply('❌ Ошибка при получении видео', videoKeyboard);
+      }
+    }
+    // Анализ видео (существующая функциональность)
+    else if (userState === 'video_analyze') {
       try {
         await ctx.reply('🎬 Анализирую видео... ⏳');
 
@@ -540,19 +626,88 @@ export class TelegramHandlers {
       }
     } else {
       await ctx.reply(
-        'Для анализа видео перейдите в:\n🎬 Видео с ИИ',
+        'Для работы с видео перейдите в:\n🎬 Видео с ИИ',
         mainKeyboard
       );
     }
   }
 
+  /**
+   * 🎬 ОБНОВЛЕНО: Обработчик текста с поддержкой промптов для генерации видео
+   */
   private async handleText(ctx: Context) {
     if (!ctx.from || !ctx.message || !('text' in ctx.message)) return;
 
     const userState = this.userStates.get(ctx.from.id);
+    const videoGenState = this.videoGenerationStates.get(ctx.from.id);
     const text = ctx.message.text;
 
-    if (userState === 'gemini_chat') {
+    // 🎬 НОВОЕ: Обработка промпта для генерации видео
+    if (userState === 'video_generate' && videoGenState?.state === 'waiting_for_prompt') {
+      try {
+        if (!videoGenState.videoUrl) {
+          await ctx.reply('❌ Ошибка: видео не найдено. Попробуйте еще раз.', videoKeyboard);
+          this.videoGenerationStates.set(ctx.from.id, { state: 'waiting_for_video' });
+          return;
+        }
+
+        await ctx.reply(
+          '🎬 Начинаю генерацию видео...\n\n' +
+          '⏳ Это может занять 2-5 минут\n' +
+          '☕️ Пожалуйста, подождите...',
+          { parse_mode: 'Markdown' }
+        );
+
+        this.logger.log(`Starting video generation for user ${ctx.from.id} with prompt: "${text}"`);
+
+        // Запускаем генерацию
+        const videoUrl = await this.runwayService.generateAndWaitForVideo({
+          prompt: text,
+          videoUrl: videoGenState.videoUrl,
+          aspectRatio: '16:9',
+        });
+
+        this.logger.log(`Video generated successfully for user ${ctx.from.id}: ${videoUrl}`);
+
+        // Скачиваем видео
+        await ctx.reply('📥 Скачиваю готовое видео... ⏳');
+        const videoBuffer = await this.runwayService.downloadVideo(videoUrl);
+
+        // Отправляем пользователю
+        await ctx.replyWithVideo(
+          { source: videoBuffer },
+          {
+            caption: 
+              `✨ *Видео готово!*\n\n` +
+              `📝 Промпт: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}\n\n` +
+              `🎬 Сгенерировано с помощью Runway AI`,
+            parse_mode: 'Markdown',
+            ...videoKeyboard
+          }
+        );
+
+        // Очищаем состояние
+        this.videoGenerationStates.delete(ctx.from.id);
+
+        this.logger.log(`Video sent successfully to user ${ctx.from.id}`);
+      } catch (error) {
+        this.logger.error(`Error generating video: ${error.message}`, error.stack);
+        await ctx.reply(
+          '❌ *Ошибка при генерации видео*\n\n' +
+          `Причина: ${error.message}\n\n` +
+          'Попробуйте еще раз или выберите другое видео.',
+          { 
+            parse_mode: 'Markdown',
+            ...videoKeyboard
+          }
+        );
+        
+        // Сброс состояния при ошибке - даем возможность попробовать снова
+        this.videoGenerationStates.set(ctx.from.id, { state: 'waiting_for_video' });
+      }
+    }
+    // Чат с Gemini (существующая функциональность)
+    else if (userState === 'gemini_chat') {
       try {
         await ctx.reply('💭 Думаю... ⏳');
 
