@@ -11,6 +11,13 @@ export class SubscriptionCommand {
   constructor(private subscriptionService: SubscriptionService) {}
 
   /**
+   * Главный метод execute для команды /subscription
+   */
+  async execute(ctx: Context) {
+    await this.showMySubscription(ctx);
+  }
+
+  /**
    * Показать информацию о текущей подписке
    */
   async showMySubscription(ctx: Context) {

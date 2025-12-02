@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Context } from 'telegraf';
 import { DatabaseService } from '../../database/database.service';
+import { mainKeyboard } from '../keyboard.config';
 
 @Injectable()
 export class StartCommand {
@@ -30,13 +31,12 @@ export class StartCommand {
         `🤝 Personal guidance from elite market experts\n\n` +
         `Membership is privilege\\.\n` +
         `Welcome to the next level\\. 🌍\n\n` +
-        `📊 *Доступные команды:*\n` +
-        `/help \\- Полная справка\n` +
-        `/ping \\- Проверить задержку\n` +
-        `/status \\- Диагностика системы\n` +
-        `/imagine \\- Генерация изображений 🍌`;
+        `👇 *Выберите раздел из меню ниже*`;
 
-      await ctx.reply(welcomeText, { parse_mode: 'MarkdownV2' });
+      await ctx.reply(welcomeText, { 
+        parse_mode: 'MarkdownV2',
+        ...mainKeyboard
+      });
       
       this.logger.log(`User ${telegramId} started the bot`);
     } catch (error) {
