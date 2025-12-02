@@ -684,41 +684,18 @@ export class TelegramHandlers {
 
         this.logger.log(`Starting text-to-video generation for user ${ctx.from.id}: "${text}"`);
 
-        const videoUrl = await this.runwayService.generateAndWaitForVideo({
-          prompt: text,
-          duration: 5,
-          quality: '720p',
-          aspectRatio: '16:9',
+        // Запускаем генерацию асинхронно (не блокируем webhook)
+        this.generateTextToVideo(ctx, text).catch(error => {
+          this.logger.error(`Background video generation failed: ${error.message}`, error.stack);
         });
 
-        this.logger.log(`Video generated successfully: ${videoUrl}`);
-
-        await ctx.reply('📥 Скачиваю готовое видео... ⏳');
-        const videoBuffer = await this.runwayService.downloadVideo(videoUrl);
-
-        await ctx.replyWithVideo(
-          { source: videoBuffer },
-          {
-            caption: 
-              `✨ *Видео готово!*\n\n` +
-              `📝 Промпт: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}\n\n` +
-              `🎬 Сгенерировано с помощью Runway AI`,
-            parse_mode: 'Markdown',
-            ...videoKeyboard
-          }
-        );
-
-        this.videoGenerationStates.delete(ctx.from.id);
-        this.logger.log(`Text-to-video sent successfully to user ${ctx.from.id}`);
       } catch (error) {
-        this.logger.error(`Error in text-to-video: ${error.message}`, error.stack);
+        this.logger.error(`Error starting text-to-video: ${error.message}`, error.stack);
         await ctx.reply(
-          '❌ *Ошибка при генерации видео*\n\n' +
-          `Причина: ${error.message}\n\n` +
+          '❌ *Ошибка при запуске генерации*\n\n' +
           'Попробуйте еще раз.',
           { parse_mode: 'Markdown', ...videoKeyboard }
         );
-        this.videoGenerationStates.set(ctx.from.id, { state: 'waiting_for_text_prompt' });
       }
     }
     // 🎬 НОВОЕ: Image-to-Video генерация
@@ -739,42 +716,18 @@ export class TelegramHandlers {
 
         this.logger.log(`Starting image-to-video generation for user ${ctx.from.id}: "${text}"`);
 
-        const videoUrl = await this.runwayService.generateAndWaitForVideo({
-          prompt: text,
-          imageUrl: videoGenState.videoUrl,
-          duration: 5,
-          quality: '720p',
-          aspectRatio: '16:9',
+        // Запускаем генерацию асинхронно
+        this.generateImageToVideo(ctx, text, videoGenState.videoUrl).catch(error => {
+          this.logger.error(`Background video generation failed: ${error.message}`, error.stack);
         });
 
-        this.logger.log(`Video generated successfully: ${videoUrl}`);
-
-        await ctx.reply('📥 Скачиваю готовое видео... ⏳');
-        const videoBuffer = await this.runwayService.downloadVideo(videoUrl);
-
-        await ctx.replyWithVideo(
-          { source: videoBuffer },
-          {
-            caption: 
-              `✨ *Видео готово!*\n\n` +
-              `📝 Описание: ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}\n\n` +
-              `🎬 Сгенерировано с помощью Runway AI`,
-            parse_mode: 'Markdown',
-            ...videoKeyboard
-          }
-        );
-
-        this.videoGenerationStates.delete(ctx.from.id);
-        this.logger.log(`Image-to-video sent successfully to user ${ctx.from.id}`);
       } catch (error) {
-        this.logger.error(`Error in image-to-video: ${error.message}`, error.stack);
+        this.logger.error(`Error starting image-to-video: ${error.message}`, error.stack);
         await ctx.reply(
-          '❌ *Ошибка при генерации видео*\n\n' +
-          `Причина: ${error.message}\n\n` +
+          '❌ *Ошибка при запуске генерации*\n\n' +
           'Попробуйте еще раз.',
           { parse_mode: 'Markdown', ...videoKeyboard }
         );
-        this.videoGenerationStates.set(ctx.from.id, { state: 'waiting_for_image' });
       }
     }
     // Чат с Gemini (существующая функциональность)
@@ -801,6 +754,127 @@ export class TelegramHandlers {
         '👋 Используйте меню ниже для выбора функций!',
         mainKeyboard
       );
+    }
+  }
+
+  // ============================================
+  // 🎬 АСИНХРОННЫЕ МЕТОДЫ ГЕНЕРАЦИИ ВИДЕО
+  // ============================================
+
+  /**
+   * 🎬 Асинхронная генерация видео из текста (фоновая задача)
+   */
+  private async generateTextToVideo(ctx: Context, prompt: string) {
+    if (!ctx.from) return;
+
+    try {
+      const videoUrl = await this.runwayService.generateAndWaitForVideo({
+        prompt: prompt,
+        duration: 5,
+        quality: '720p',
+        aspectRatio: '16:9',
+      });
+
+      this.logger.log(`Video generated successfully: ${videoUrl}`);
+
+      await ctx.telegram.sendMessage(
+        ctx.from.id,
+        '📥 Скачиваю готовое видео... ⏳'
+      );
+
+      const videoBuffer = await this.runwayService.downloadVideo(videoUrl);
+
+      // Правильный способ отправки видео
+      await ctx.telegram.sendVideo(
+        ctx.from.id,
+        { source: videoBuffer },
+        {
+          caption: 
+            `✨ *Видео готово!*\n\n` +
+            `📝 Промпт: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}\n\n` +
+            `🎬 Сгенерировано с помощью Runway AI`,
+          parse_mode: 'Markdown',
+          ...videoKeyboard
+        }
+      );
+
+      this.videoGenerationStates.delete(ctx.from.id);
+      this.logger.log(`Text-to-video sent successfully to user ${ctx.from.id}`);
+    } catch (error) {
+      this.logger.error(`Error in generateTextToVideo: ${error.message}`, error.stack);
+      
+      try {
+        await ctx.telegram.sendMessage(
+          ctx.from.id,
+          '❌ *Ошибка при генерации видео*\n\n' +
+          `Причина: ${error.message}\n\n` +
+          'Попробуйте еще раз.',
+          { parse_mode: 'Markdown', ...videoKeyboard }
+        );
+      } catch (sendError) {
+        this.logger.error(`Failed to send error message: ${sendError.message}`);
+      }
+      
+      this.videoGenerationStates.set(ctx.from.id, { state: 'waiting_for_text_prompt' });
+    }
+  }
+
+  /**
+   * 🎬 Асинхронная генерация видео из изображения (фоновая задача)
+   */
+  private async generateImageToVideo(ctx: Context, prompt: string, imageUrl: string) {
+    if (!ctx.from) return;
+
+    try {
+      const videoUrl = await this.runwayService.generateAndWaitForVideo({
+        prompt: prompt,
+        imageUrl: imageUrl,
+        duration: 5,
+        quality: '720p',
+        aspectRatio: '16:9',
+      });
+
+      this.logger.log(`Video generated successfully: ${videoUrl}`);
+
+      await ctx.telegram.sendMessage(
+        ctx.from.id,
+        '📥 Скачиваю готовое видео... ⏳'
+      );
+
+      const videoBuffer = await this.runwayService.downloadVideo(videoUrl);
+
+      // Правильный способ отправки видео
+      await ctx.telegram.sendVideo(
+        ctx.from.id,
+        { source: videoBuffer },
+        {
+          caption: 
+            `✨ *Видео готово!*\n\n` +
+            `📝 Описание: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}\n\n` +
+            `🎬 Сгенерировано с помощью Runway AI`,
+          parse_mode: 'Markdown',
+          ...videoKeyboard
+        }
+      );
+
+      this.videoGenerationStates.delete(ctx.from.id);
+      this.logger.log(`Image-to-video sent successfully to user ${ctx.from.id}`);
+    } catch (error) {
+      this.logger.error(`Error in generateImageToVideo: ${error.message}`, error.stack);
+      
+      try {
+        await ctx.telegram.sendMessage(
+          ctx.from.id,
+          '❌ *Ошибка при генерации видео*\n\n' +
+          `Причина: ${error.message}\n\n` +
+          'Попробуйте еще раз.',
+          { parse_mode: 'Markdown', ...videoKeyboard }
+        );
+      } catch (sendError) {
+        this.logger.error(`Failed to send error message: ${sendError.message}`);
+      }
+      
+      this.videoGenerationStates.set(ctx.from.id, { state: 'waiting_for_image' });
     }
   }
 }
