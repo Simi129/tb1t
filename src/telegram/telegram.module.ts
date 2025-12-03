@@ -8,10 +8,10 @@ import { SubscriptionCommand } from './commands/subscription.command';
 import { SubscriptionService } from './subscription.service';
 import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
-import { RunwayModule } from '../runway/runway.module';
+import { ReplicateModule } from '../replicate/replicate.module';
 
 @Module({
-  imports: [DatabaseModule, AiModule, RunwayModule],
+  imports: [DatabaseModule, AiModule, ReplicateModule],
   controllers: [TelegramController],
   providers: [
     TelegramService,
