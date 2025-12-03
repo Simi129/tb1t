@@ -5,7 +5,7 @@ import { StartCommand } from './commands/start.command';
 import { HelpCommand } from './commands/help.command';
 import { SubscriptionCommand } from './commands/subscription.command';
 import { GeminiService } from '../ai/gemini.service';
-import { RunwayService } from '../runway/runway.service';
+import { ReplicateService } from '../replicate/replicate.service';
 import { DatabaseService } from '../database/database.service';
 import { 
   KEYBOARD_BUTTONS, 
@@ -39,7 +39,7 @@ export class TelegramHandlers {
     private readonly helpCommand: HelpCommand,
     private readonly subscriptionCommand: SubscriptionCommand,
     private readonly geminiService: GeminiService,
-    private readonly runwayService: RunwayService,
+    private readonly replicateService: ReplicateService,
     private readonly databaseService: DatabaseService,
   ) {}
 
@@ -191,7 +191,7 @@ export class TelegramHandlers {
       `✅ Бот работает\n` +
       `⏱ Uptime: ${hours}ч ${minutes}м\n` +
       `🤖 Gemini AI: Активен\n` +
-      `🎬 Runway AI: Активен\n` +
+      `🎬 MiniMax Video AI: Активен\n` +
       `💾 База данных: Подключена`;
 
     await ctx.reply(statusText, {
@@ -768,11 +768,8 @@ export class TelegramHandlers {
     if (!ctx.from) return;
 
     try {
-      const videoUrl = await this.runwayService.generateAndWaitForVideo({
+      const videoUrl = await this.replicateService.generateVideo({
         prompt: prompt,
-        duration: 5,
-        quality: '720p',
-        aspectRatio: '16:9',
       });
 
       this.logger.log(`Video generated successfully: ${videoUrl}`);
@@ -782,7 +779,7 @@ export class TelegramHandlers {
         '📥 Скачиваю готовое видео... ⏳'
       );
 
-      const videoBuffer = await this.runwayService.downloadVideo(videoUrl);
+      const videoBuffer = await this.replicateService.downloadVideo(videoUrl);
 
       // Правильный способ отправки видео
       await ctx.telegram.sendVideo(
@@ -792,7 +789,7 @@ export class TelegramHandlers {
           caption: 
             `✨ *Видео готово!*\n\n` +
             `📝 Промпт: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}\n\n` +
-            `🎬 Сгенерировано с помощью Runway AI`,
+            `🎬 Сгенерировано с помощью MiniMax AI`,
           parse_mode: 'Markdown',
           ...videoKeyboard
         }
@@ -826,12 +823,9 @@ export class TelegramHandlers {
     if (!ctx.from) return;
 
     try {
-      const videoUrl = await this.runwayService.generateAndWaitForVideo({
+      const videoUrl = await this.replicateService.generateVideo({
         prompt: prompt,
         imageUrl: imageUrl,
-        duration: 5,
-        quality: '720p',
-        aspectRatio: '16:9',
       });
 
       this.logger.log(`Video generated successfully: ${videoUrl}`);
@@ -841,7 +835,7 @@ export class TelegramHandlers {
         '📥 Скачиваю готовое видео... ⏳'
       );
 
-      const videoBuffer = await this.runwayService.downloadVideo(videoUrl);
+      const videoBuffer = await this.replicateService.downloadVideo(videoUrl);
 
       // Правильный способ отправки видео
       await ctx.telegram.sendVideo(
@@ -851,7 +845,7 @@ export class TelegramHandlers {
           caption: 
             `✨ *Видео готово!*\n\n` +
             `📝 Описание: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}\n\n` +
-            `🎬 Сгенерировано с помощью Runway AI`,
+            `🎬 Сгенерировано с помощью MiniMax AI`,
           parse_mode: 'Markdown',
           ...videoKeyboard
         }

@@ -9,13 +9,13 @@ import { RunwayModule } from './runway/runway.module';
 import supabaseConfig from './config/supabase.config';
 import telegramConfig from './config/telegram.config';
 import geminiConfig from './config/gemini.config';
-import runwayConfig from './config/runway.config';
+import replicateConfig from './config/replicate.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [supabaseConfig, telegramConfig, geminiConfig, runwayConfig],
+      load: [supabaseConfig, telegramConfig, geminiConfig, replicateConfig],
     }),
     TelegramModule,
     DatabaseModule,
