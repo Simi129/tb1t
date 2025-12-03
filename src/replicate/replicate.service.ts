@@ -43,34 +43,68 @@ export class ReplicateService {
         this.logger.debug(`Using image URL: ${options.imageUrl}`);
       }
 
-      this.logger.debug(`Running minimax/video-01 model...`);
+      this.logger.debug(`Creating prediction for minimax/video-01...`);
 
-      // Запускаем модель
-      const output = await this.replicate.run(
-        "minimax/video-01" as any,
-        { input }
-      );
+      // Создаем предсказание
+      const prediction = await this.replicate.predictions.create({
+        version: "minimax/video-01",
+        input: input,
+      });
 
-      const processingTime = Date.now() - startTime;
+      this.logger.log(`⏳ Prediction created: ${prediction.id}, waiting for completion...`);
 
-      // output - это либо строка (URL), либо массив
-      let videoUrl: string;
-      if (Array.isArray(output)) {
-        videoUrl = output[0];
-      } else if (typeof output === 'string') {
-        videoUrl = output;
-      } else {
-        throw new Error(`Unexpected output format: ${JSON.stringify(output)}`);
+      // Ждем завершения
+      let completed = false;
+      let attempts = 0;
+      const maxAttempts = 60; // 60 попыток × 5 секунд = 5 минут
+
+      while (!completed && attempts < maxAttempts) {
+        attempts++;
+        
+        // Ждем 5 секунд перед проверкой
+        await this.sleep(5000);
+
+        // Получаем статус
+        const current = await this.replicate.predictions.get(prediction.id);
+
+        this.logger.debug(`📊 Attempt ${attempts}/${maxAttempts}: Status = ${current.status}`);
+
+        if (current.status === 'succeeded') {
+          completed = true;
+          const processingTime = Date.now() - startTime;
+
+          // Получаем URL видео
+          let videoUrl: string;
+          if (Array.isArray(current.output)) {
+            videoUrl = current.output[0];
+          } else if (typeof current.output === 'string') {
+            videoUrl = current.output;
+          } else {
+            throw new Error(`Unexpected output format: ${JSON.stringify(current.output)}`);
+          }
+
+          this.logger.log(`✅ Video generated successfully in ${(processingTime / 1000).toFixed(1)}s: ${videoUrl}`);
+          return videoUrl;
+        } else if (current.status === 'failed') {
+          throw new Error(`Prediction failed: ${current.error || 'Unknown error'}`);
+        } else if (current.status === 'canceled') {
+          throw new Error('Prediction was canceled');
+        }
+
+        // Статус processing или starting - продолжаем ждать
       }
 
-      this.logger.log(`✅ Video generated successfully in ${(processingTime / 1000).toFixed(1)}s: ${videoUrl}`);
-      
-      return videoUrl;
+      throw new Error(`Prediction timed out after ${maxAttempts} attempts (${(maxAttempts * 5 / 60).toFixed(1)} minutes)`);
+
     } catch (error: any) {
       const processingTime = Date.now() - startTime;
       this.logger.error(`❌ Error generating video (${processingTime}ms): ${error.message}`, error.stack);
       throw new Error(`Video generation failed: ${error.message}`);
     }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async downloadVideo(videoUrl: string): Promise<Buffer> {
