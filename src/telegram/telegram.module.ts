@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { TelegramHandlers } from './telegram.handlers';
 import { TelegramController } from './telegram.controller';
@@ -9,9 +9,15 @@ import { SubscriptionService } from './subscription.service';
 import { DatabaseModule } from '../database/database.module';
 import { AiModule } from '../ai/ai.module';
 import { ReplicateModule } from '../replicate/replicate.module';
+import { ImageProcessingModule } from '../image-processing/image-processing.module'; // ДОБАВЛЕНО
 
 @Module({
-  imports: [DatabaseModule, AiModule, ReplicateModule],
+  imports: [
+    DatabaseModule, 
+    AiModule, 
+    ReplicateModule,
+    ImageProcessingModule, // ДОБАВЛЕНО - модуль сканирования изображений
+  ],
   controllers: [TelegramController],
   providers: [
     TelegramService,
